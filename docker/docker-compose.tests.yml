@@ -1,0 +1,13 @@
+services:
+  tests:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.tests
+    command: python manage.py runserver 0.0.0.0:8080
+    volumes:
+      - ../app:/usr/src/nginx_logs
+      - ../tests:/usr/src/nginx_logs/tests
+    ports:
+      - 8080:8080
+    env_file:
+      - ../.env.test

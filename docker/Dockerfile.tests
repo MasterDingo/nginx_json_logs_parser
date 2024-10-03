@@ -1,0 +1,52 @@
+FROM python:3.11.4-slim-buster
+
+WORKDIR /usr/src/nginx_logs
+
+# Don't write .pyc files
+ENV PYTHONDONTWRITEBYTECODE=1
+# Don't buffer std IO
+ENV PYTHONUNBUFFERED=1
+
+# Upgrade pip
+RUN pip install --upgrade pip
+
+# This image has too old sqlite3 version
+# So, let's get the newer one
+
+# Prepare environment
+RUN apt-get update \
+    && apt-get upgrade -y \
+    && apt-get install -y wget make gcc libtool-bin \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install sqlite3 system library
+RUN mkdir -p /tmp/sqlite3 \
+    && cd /tmp/sqlite3 \
+    && wget https://sqlite.org/2024/sqlite-autoconf-3460100.tar.gz \
+    && tar zxvf ./sqlite-autoconf-3460100.tar.gz \
+    && cd sqlite-autoconf-3460100 \
+    && ./configure \
+    && make \
+    && make install \
+    && libtool --finish /usr/local/lib \
+    && ldconfig \
+    && hash -r \
+    && rm -rf /tmp/*
+
+# Upgrade Python package
+RUN pip install --upgrade pysqlite3
+
+# Clean up
+RUN apt-get remove --purge -y wget make gcc libtool-bin \
+    && apt-get autoremove -y \
+    && rm -rf /var/lib/apt/lists/*
+
+#COPY ../../app .
+#COPY ../tests ./tests
+COPY docker/entrypoint.sh /usr/local/bin
+COPY tests/requirements.txt .
+# Install Python requirements
+# COPY ./tests/requirements.txt .
+RUN pip install -r requirements.txt
+
+ENTRYPOINT [ "/usr/local/bin/entrypoint.sh" ]

@@ -1,0 +1,25 @@
+FROM python:3.11.4-slim-buster
+
+WORKDIR /usr/src/nginx_logs
+
+# Don't write .pyc files
+ENV PYTHONDONTWRITEBYTECODE=1
+# Don't buffer std IO
+ENV PYTHONUNBUFFERED=1
+
+RUN apt-get update \
+    && apt-get install -y curl
+RUN apt-get autoremove -y \
+    && rm -rf /var/lib/apt/lists/*
+
+# Upgrade pip
+RUN pip install --upgrade pip
+# Install requirements
+COPY app/requirements.txt .
+RUN pip install -r requirements.txt
+RUN pip install gunicorn==21.2.0
+
+COPY app .
+COPY docker/entrypoint.sh /usr/local/bin
+
+ENTRYPOINT [ "/usr/local/bin/entrypoint.sh" ]

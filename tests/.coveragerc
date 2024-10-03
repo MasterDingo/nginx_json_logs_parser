@@ -1,0 +1,12 @@
+[report]
+include_namespace_packages = true
+
+# might also be convenient to add one of these:
+omit =
+    **/asgi.py
+    **/wsgi.py
+    **/urls.py
+    manage.py
+    **/admin.py
+    tests/**
+skip_empty = true

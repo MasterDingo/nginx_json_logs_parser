@@ -1,0 +1,36 @@
+services:
+  dev:
+    build: 
+      context: ..
+      dockerfile: docker/Dockerfile.dev
+    command: python manage.py runserver 0.0.0.0:8000
+    volumes:
+      - ../app:/usr/src/nginx_logs
+    ports:
+      - 8000:8000
+    env_file:
+      - ../.env.dev
+    depends_on:
+      dev-db:
+        condition: service_healthy
+        restart: true
+  
+  dev-db:
+    image: postgres:15
+    env_file:
+      - ../.env.dev
+    volumes:
+       - postgres_db:/var/lib/postgresql/data/
+    environment:
+      - POSTGRES_USER=nginx_logs_user
+      - POSTGRES_PASSWORD=dev-pwd123
+      - POSTGRES_DB=nginx_logs
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U nginx_logs_user -d nginx_logs"]
+      interval: 10s
+      retries: 5
+      start_period: 30s
+      timeout: 10s
+
+volumes:
+  postgres_db:

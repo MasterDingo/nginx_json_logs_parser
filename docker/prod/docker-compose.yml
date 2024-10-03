@@ -1,0 +1,61 @@
+services:
+  prod:
+    build: 
+      context: ../..
+      dockerfile: docker/prod/Dockerfile.web
+    command: gunicorn app.wsgi:application --bind 0.0.0.0:8000
+    volumes:
+      - ../../app:/usr/src/nginx_logs
+      - static:/usr/src/nginx_logs/static
+    env_file:
+      - .env
+    restart: unless-stopped
+    depends_on:
+      prod-db:
+        condition: service_healthy
+        restart: true
+    healthcheck:
+      test: curl --fail http://localhost:8000 || exit 1
+      interval: 10s
+      timeout: 10s
+      retries: 5
+      start_period: 3s
+  
+  prod-db:
+    image: postgres:15
+    env_file:
+      - .env
+    volumes:
+       - postgres_db:/var/lib/postgresql/data/
+    environment:
+      - POSTGRES_USER=nginx_logs_user
+      - POSTGRES_PASSWORD=dev-pwd123
+      - POSTGRES_DB=nginx_logs
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U nginx_logs_user -d nginx_logs"]
+      interval: 10s
+      retries: 5
+      start_period: 3s
+      timeout: 10s
+
+  nginx:
+    build: 
+      context: .
+      dockerfile: ./Dockerfile.nginx
+    restart: unless-stopped
+    volumes:
+      - static:/static
+    env_file:
+      - .env
+    ports:
+      - 80:80
+      - 443:443
+    depends_on:
+      prod:
+        condition: service_healthy
+        restart: true
+
+volumes:
+  postgres_db:
+  static:

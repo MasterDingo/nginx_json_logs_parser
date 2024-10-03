@@ -1,0 +1,19 @@
+FROM python:3.11.4-slim-buster
+
+WORKDIR /usr/src/nginx_logs
+
+# Don't write .pyc files
+ENV PYTHONDONTWRITEBYTECODE=1
+# Don't buffer std IO
+ENV PYTHONUNBUFFERED=1
+
+# Upgrade pip
+RUN pip install --upgrade pip
+# Install requirements
+COPY app/requirements.dev.txt .
+RUN pip install -r requirements.dev.txt
+
+COPY app .
+COPY docker/entrypoint.sh /usr/local/bin
+
+ENTRYPOINT [ "/usr/local/bin/entrypoint.sh" ]
