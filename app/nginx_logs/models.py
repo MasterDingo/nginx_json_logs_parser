@@ -26,10 +26,10 @@ class NginxLog(models.Model):
     status: models.IntegerField = models.IntegerField(
         verbose_name="HTTP Status", db_index=True
     )
-    bytes_sent: models.IntegerField = models.IntegerField(verbose_name="Bytes sent")
+    bytes_sent: models.IntegerField = models.BigIntegerField(verbose_name="Bytes sent")
 
     def __str__(self) -> str:
-        return f"{self.date} {self.ip} -> {self.method} {self.uri} ({self.status})"
+        return f"{self.date} {self.ip} -> {self.method} {self.uri} ({self.status}) - {self.bytes_sent} bytes"
 
     class Meta:
         verbose_name = "Nginx log record"

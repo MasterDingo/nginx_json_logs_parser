@@ -1,5 +1,5 @@
 from collections.abc import Callable
-from typing import Any, Iterator
+from typing import Iterator
 
 from django.dispatch import Signal
 
@@ -9,17 +9,22 @@ from nginx_logs.models import NginxLog
 from .log_types import LogRecord
 
 
-line_parsed = Signal()
-malformed_line = Signal()
-flushed = Signal()
+line_parsed_signal = Signal()
+malformed_line_signal = Signal()
+flushed_signal = Signal()
 
 
 class LogImporter:
-    """Parses logs on line-by-line basis and stores them into DB in a bulk operations.
+    """
+    A class to parse logs line-by-line and stores them into DB in bulk operations.
 
     Args:
-        parser (Callable): A callable to parse one log line.
-        batch_size (int): How many records to store in one bulk operation.
+        parser (Callable): A callable object to parse a log line.
+        batch_size (int): The number of records to store in one bulk operation.
+
+    Attributes:
+        current_batch_number (property): The current batch number.
+        stats (property): The statistics of log parsing and storing.
     """
 
     def __init__(self, parser: Callable[[str], LogRecord], batch_size: int) -> None:
@@ -28,53 +33,53 @@ class LogImporter:
         self.__writer = BatchModelWriter[NginxLog](NginxLog, batch_size)
         self.__total_lines = 0
         self.__skipped_lines = 0
-        self.__subscribers: dict[str, list[Callable[[Any], None]]] = {}
 
     @property
     def current_batch_number(self) -> int:
-        """A number of the current batch"""
+        """The current batch number."""
         return self.__writer.current_batch_number
 
+    @property
+    def stats(self) -> dict[str, int]:
+        """
+        The statistics of log parsing and storing.
+
+        Returns:
+            dict: A dictionary containing the total lines, skipped lines, stored records, and incomplete batches.
+        """
+        writer_stats = self.__writer.stats
+        return {
+            "total": self.__total_lines,
+            "skipped": self.__skipped_lines,
+            "stored": writer_stats["total"],
+            "incomplete_batches": writer_stats["incomplete_batches"],
+        }
+
     def parse(self, lines: Iterator[str]) -> None:
-        """Parse an iterable of log lines.
+        """
+        Parse an iterable of log lines.
 
         Args:
-            lines (Iterator[str]): Log lines.
+            lines (Iterator[str]): An iterable of log lines.
         """
         for line in lines:
             self.parse_line(line)
         self.flush()
 
     def parse_line(self, line: str) -> int:
-        """Adds one log line to parse.
+        """
+        Parse a single log line.
 
         Args:
-            line (str): New log line.
+            line (str): The log line to be parsed.
 
         Returns:
-            A number of stored DB models this time or -1 if failed to parse the log string.
+            int: The number of stored DB models this time, or -1 if failed to parse the log string.
         """
         self.__total_lines += 1
         parsed_line = self.__parser(line)
-        if parsed_line is not None:
-            line_parsed.send_robust(
-                self,
-                batch_number=self.current_batch_number,
-                line_number=self.__total_lines,
-            )
-
-            model = NginxLog(**(parsed_line._asdict()))
-            records_stored = self.__writer.add(model)
-            if records_stored > 0:
-                flushed.send_robust(
-                    self,
-                    batch_number=self.current_batch_number - 1,
-                    records_stored=records_stored,
-                    batch_incomplete=records_stored < self.__batch_size,
-                )
-            return records_stored
-        else:
-            malformed_line.send_robust(
+        if parsed_line is None:
+            malformed_line_signal.send_robust(
                 self,
                 batch_number=self.current_batch_number,
                 line_number=self.__total_lines,
@@ -84,27 +89,36 @@ class LogImporter:
             self.__skipped_lines += 1
             return -1
 
+        line_parsed_signal.send_robust(
+            self,
+            batch_number=self.current_batch_number,
+            line_number=self.__total_lines,
+        )
+
+        model = NginxLog(**(parsed_line._asdict()))
+        records_stored = self.__writer.add(model)
+        if records_stored > 0:
+            flushed_signal.send_robust(
+                self,
+                batch_number=self.current_batch_number - 1,
+                records_stored=records_stored,
+                batch_incomplete=records_stored < self.__batch_size,
+            )
+
+        return records_stored
+
     def flush(self) -> int:
-        """Immediately flushes incomplete batch.
+        """
+        Immediately flush the incomplete batch.
 
         Returns:
-            Stored records count.
+            int: The number of stored records.
         """
         records_stored = self.__writer.flush()
-        flushed.send_robust(
+        flushed_signal.send_robust(
             self,
             batch_number=self.current_batch_number - 1,
             records_stored=records_stored,
             batch_incomplete=records_stored < self.__batch_size,
         )
         return records_stored
-
-    @property
-    def stats(self):
-        writer_stats = self.__writer.stats
-        return {
-            "total": self.__total_lines,
-            "skipped": self.__skipped_lines,
-            "stored": writer_stats["total"],
-            "incomplete_batches": writer_stats["incomplete_batches"],
-        }

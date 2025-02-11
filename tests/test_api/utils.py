@@ -21,7 +21,7 @@ def field_wise_compare(json_dict, model):
     assert model.bytes_sent == json_dict["bytes_sent"]
 
 
-def api_filter_tester(client, url, models, field_name):
+def api_filter_tester(client, url, models, field_name, page_size=10):
     """
     Helper function to test REST API filtering.
 
@@ -38,14 +38,14 @@ def api_filter_tester(client, url, models, field_name):
     field_value = getattr(random_model, field_name)
     test_models = list(filter(lambda m: getattr(m, field_name) == field_value, models))
 
-    response = client.get(f"{url}?{field_name}={field_value}&ordering=-date")
+    response = client.get(f"{url}?{field_name}={field_value}&size={page_size}&ordering=-date")
 
     assert response.status_code == 200
     assert response.headers["content-type"] == "application/json"
 
     json_resp = json.loads(response.content)
     assert json_resp["count"] == len(test_models)
-    assert len(json_resp["results"]) == min(10, len(test_models))
+    assert len(json_resp["results"]) == min(page_size, len(test_models))
 
     counter = 0
     for record in json_resp["results"]:
@@ -53,7 +53,7 @@ def api_filter_tester(client, url, models, field_name):
         counter += 1
 
 
-def api_search_tester(client, url, models, search):
+def api_search_tester(client, url, models, search, page_size=10):
     """
     Helper function to test REST API searching.
 
@@ -79,14 +79,14 @@ def api_search_tester(client, url, models, search):
     )
 
     search_params = "&".join([f"{field}={value}" for field, value in search.items()])
-    response = client.get(f"{url}?{search_params}")
+    response = client.get(f"{url}?{search_params}&size={page_size}")
 
     assert response.status_code == 200
     assert response.headers["content-type"] == "application/json"
 
     json_resp = json.loads(response.content)
     assert json_resp["count"] == len(test_models)
-    assert len(json_resp["results"]) == min(10, len(test_models))
+    assert len(json_resp["results"]) == min(page_size, len(test_models))
 
     counter = 0
     for record in json_resp["results"]:

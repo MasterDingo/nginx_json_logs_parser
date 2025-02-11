@@ -1,9 +1,7 @@
 #!/bin/sh
 
-pwd
-ls -la
-
-# pip install -r tests/requirements.txt
+# pwd
+# ls -la
 
 python manage.py migrate
 python manage.py createcachetable

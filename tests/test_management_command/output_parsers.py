@@ -87,7 +87,7 @@ def parse_stdout(text: str) -> StdoutStatType:
     """
     batch_lines: list[tuple[int, int]] = []
     extra_line = None
-    total_line: tuple[int, int, int]
+    total_line: tuple[int, int, int] = (0, 0, 0)
     state = StdoutParsingState.STORE_LINE
 
     for line in text.splitlines():

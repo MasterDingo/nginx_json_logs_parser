@@ -5,7 +5,7 @@
 **/.pytest_cache
 **/*.sqlite3
 **/.coverage
-app/app/static/
+app/**/static/
 docker/prod/.env
 docker/prod/ssl/certs
 docker/prod/ssl/private

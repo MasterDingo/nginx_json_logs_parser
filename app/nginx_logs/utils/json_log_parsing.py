@@ -38,20 +38,26 @@ def parse_json_log_record(line: str) -> LogRecord | None:
     """
     try:
         item = json.loads(line)
-    except Exception:
+    except json.JSONDecodeError:
         return None
+
     # Parse a `request` field into a method and URI
-    # Early return if the dict has now such key
+    # Early return if the dict has no such key
     if "request" in item:
         parsed_request = parse_request_line(item["request"])
         if parsed_request is not None:
+            try:
+                date = datetime.strptime(item["time"], LOG_DATETIME_FORMAT)
+            except ValueError:
+                return None
+
             return LogRecord(
-                item["remote_ip"],
-                datetime.strptime(item["time"], LOG_DATETIME_FORMAT),
-                parsed_request.method,
-                parsed_request.uri,
-                item["response"],
-                item["bytes"],
+                ip=item["remote_ip"],
+                date=date,
+                method=parsed_request.method,
+                uri=parsed_request.uri,
+                status=item["response"],
+                bytes_sent=item["bytes"],
             )
 
     return None
